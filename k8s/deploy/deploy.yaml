@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-market
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend-market
+  template:
+    metadata:
+      labels:
+        app: backend-market
+    spec:
+      containers:
+      - name: backend-market
+        image: {IMAGE_TAG}
+        ports:
+        - containerPort: 8080
+        resources:
+          # You must specify requests for CPU to autoscale
+          # based on CPU utilization
+          limits:
+            cpu: 50m
+            memory: 128Mi
+          requests:
+            cpu: 50m
+            memory: 128Mi
