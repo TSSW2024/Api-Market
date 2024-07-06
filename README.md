@@ -1,6 +1,6 @@
 # Servidor de Scraping y API de Criptomonedas
 
-Este repositorio contiene un servidor escrito en Go que realiza scraping de datos de criptomonedas desde Binance y ofrece una API para consultar estos datos categorizados.
+Este repositorio contiene un servidor escrito en Go que realiza scraping de datos de criptomonedas desde Binance y ofrece una API para consultar estos datos categorizados
 
 ## Funcionalidades Implementadas
 
