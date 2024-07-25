@@ -89,7 +89,7 @@ func handleRequest(c *gin.Context) {
 			if info.Name != "" {
 				symbol := strings.ToUpper(info.Name) + "USDT"
 				info.Price = prices[symbol]
-				info.Change24h = formatChange(changes[symbol])
+				info.Change24h = (changes[symbol])
 
 				// Descargar la imagen si la URL está presente
 				if info.Image != "" {
@@ -254,5 +254,5 @@ func formatChange(change string) string {
 	if changeValue > 0 {
 		return fmt.Sprintf("+%.2f%%", changeValue)
 	}
-	return fmt.Sprintf("%.2f%%", changeValue)
+	return fmt.Sprintf("%.2f%%", changeValue)
 }
