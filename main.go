@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -24,13 +23,6 @@ type CryptoInfo struct {
 	Change24h string `json:"change_24h"`
 }
 
-var (
-	categorizedResults map[string][]CryptoInfo
-	mutex              sync.Mutex
-	scheme             = "http"
-	host               = "localhost:8080"
-)
-
 func main() {
 	// Configurar Gin como el enrutador
 	router := gin.Default()
@@ -44,30 +36,12 @@ func main() {
 	// Servir archivos estáticos (imágenes) desde la carpeta local
 	router.Static("/images", "./images")
 
-	// Iniciar una goroutine para actualizar los datos cada cierto intervalo
-	go updateDataRegularly()
-
 	// Iniciar el servidor en el puerto 8080
 	fmt.Println("Servidor escuchando en http://localhost:8080")
 	log.Fatal(router.Run(":8080"))
 }
 
 func handleRequest(c *gin.Context) {
-	// Obtener los datos almacenados en la memoria
-	c.JSON(http.StatusOK, categorizedResults)
-}
-
-func updateDataRegularly() {
-	for {
-		// Ejecutar el scraping y la actualización de datos
-		updateDataFromBinance()
-
-		// Esperar antes de la próxima actualización (por ejemplo, cada 5 minutos)
-		time.Sleep(5 * time.Second)
-	}
-}
-
-func updateDataFromBinance() {
 	// URL a scrapear
 	url := "https://www.binance.com/es/markets/trading_data/rankings"
 
@@ -79,6 +53,8 @@ func updateDataFromBinance() {
 
 	// Variables para almacenar los resultados
 	var allResults []CryptoInfo
+	var groupedResults [][]CryptoInfo
+	var mutex sync.Mutex
 
 	// Función para extraer la información de cada bloque relevante
 	collyCollector.OnHTML("div.rounded-xl.border.border-line.p-m", func(e *colly.HTMLElement) {
@@ -108,8 +84,13 @@ func updateDataFromBinance() {
 					if !imageExists(imageFilename) {
 						downloadImage(info.Image, imageFilename)
 					}
+					// Obtener el esquema (http o https) de la solicitud actual
+					scheme := "http"
+					if c.Request.TLS != nil {
+						scheme = "https"
+					}
 					// Reemplazar la URL de la imagen con la ruta local
-					info.Image = scheme + "://" + host + "/images/" + imageFilename
+					info.Image = scheme + "://" + c.Request.Host + "/images/" + imageFilename
 				}
 
 				mutex.Lock()
@@ -124,22 +105,25 @@ func updateDataFromBinance() {
 		log.Printf("Request URL: %s failed with response: %v\nError: %s\n", r.Request.URL, r, err)
 	})
 
-	// Visitar la URL y ejecutar el scraping
+	// Visitar la URL y ejecutar el scraping cada vez que se realiza una solicitud
 	err := collyCollector.Visit(url)
 	if err != nil {
-		log.Printf("Error visiting URL: %v\n", err)
+		log.Fatal(err)
 	}
 
 	// Dividir los resultados en grupos de 10 objetos y ordenarlos según las categorías
-	groupedResults := categorizeResults(allResults)
+	groupedResults = categorizeResults(allResults)
 
 	// Mapa para almacenar los resultados agrupados por categoría
-	categorizedResults = map[string][]CryptoInfo{
+	categorizedResults := map[string][]CryptoInfo{
 		"Populares":    groupedResults[0],
 		"Ganadores":    groupedResults[1],
 		"Perdedores":   groupedResults[2],
 		"MayorVolumen": groupedResults[3],
 	}
+
+	// Devolver los resultados como JSON
+	c.JSON(http.StatusOK, categorizedResults)
 }
 
 // Función para dividir y agrupar los resultados en grupos de 10 objetos
