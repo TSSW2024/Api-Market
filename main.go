@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -16,11 +18,21 @@ import (
 )
 
 type CryptoInfo struct {
-	Index     string `json:"index"`
-	Image     string `json:"image"`
-	Name      string `json:"name"`
-	Price     string `json:"price"`
-	Change24h string `json:"change_24h"`
+	Index     string json:"index"
+	Image     string json:"image"
+	Name      string json:"name"
+	Price     string json:"price"
+	Change24h string json:"change_24h"
+}
+
+type BinancePriceInfo struct {
+	Symbol string json:"symbol"
+	Price  string json:"price"
+}
+
+type BinanceTickerInfo struct {
+	Symbol             string json:"symbol"
+	PriceChangePercent string json:"priceChangePercent"
 }
 
 func main() {
@@ -56,6 +68,9 @@ func handleRequest(c *gin.Context) {
 	var groupedResults [][]CryptoInfo
 	var mutex sync.Mutex
 
+	// Obtener los precios y cambios de la API de Binance
+	prices, changes := getPricesAndChanges()
+
 	// Función para extraer la información de cada bloque relevante
 	collyCollector.OnHTML("div.rounded-xl.border.border-line.p-m", func(e *colly.HTMLElement) {
 		e.ForEach("div.css-1qyk0y6", func(index int, div *colly.HTMLElement) {
@@ -72,11 +87,9 @@ func handleRequest(c *gin.Context) {
 
 			// Verificar si el nombre está vacío antes de continuar
 			if info.Name != "" {
-				price := div.ChildText("div.body3.css-1i04fkn")
-				info.Price = price
-
-				change24h := div.ChildText("div[class^='body3 line-clamp-1 truncate']")
-				info.Change24h = change24h
+				symbol := strings.ToUpper(info.Name) + "USDT"
+				info.Price = prices[symbol]
+				info.Change24h = formatChange(changes[symbol])
 
 				// Descargar la imagen si la URL está presente
 				if info.Image != "" {
@@ -185,4 +198,61 @@ func downloadImage(url, filename string) {
 		log.Printf("Error writing image to file: %v\n", err)
 		return
 	}
+}
+
+// Función para obtener precios y cambios desde la API de Binance
+func getPricesAndChanges() (map[string]string, map[string]string) {
+	prices := make(map[string]string)
+	changes := make(map[string]string)
+
+	// Obtener precios
+	resp, err := http.Get("https://api.binance.com/api/v3/ticker/price")
+	if err != nil {
+		log.Printf("Error fetching prices: %v\n", err)
+		return prices, changes
+	}
+	defer resp.Body.Close()
+
+	var priceData []BinancePriceInfo
+	if err := json.NewDecoder(resp.Body).Decode(&priceData); err != nil {
+		log.Printf("Error decoding price data: %v\n", err)
+		return prices, changes
+	}
+
+	for _, item := range priceData {
+		prices[item.Symbol] = item.Price
+	}
+
+	// Obtener cambios de 24 horas
+	resp, err = http.Get("https://api.binance.com/api/v3/ticker/24hr")
+	if err != nil {
+		log.Printf("Error fetching 24h change: %v\n", err)
+		return prices, changes
+	}
+	defer resp.Body.Close()
+
+	var changeData []BinanceTickerInfo
+	if err := json.NewDecoder(resp.Body).Decode(&changeData); err != nil {
+		log.Printf("Error decoding change data: %v\n", err)
+		return prices, changes
+	}
+
+	for _, item := range changeData {
+		changes[item.Symbol] = formatChange(item.PriceChangePercent)
+	}
+
+	return prices, changes
+}
+
+// Función para formatear el cambio de 24 horas con el signo +/-
+func formatChange(change string) string {
+	changeValue, err := strconv.ParseFloat(change, 64)
+	if err != nil {
+		log.Printf("Error parsing change value: %v\n", err)
+		return change
+	}
+	if changeValue > 0 {
+		return fmt.Sprintf("+%.2f%%", changeValue)
+	}
+	return fmt.Sprintf("%.2f%%", changeValue)
 }
