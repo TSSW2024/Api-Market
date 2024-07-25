@@ -18,21 +18,21 @@ import (
 )
 
 type CryptoInfo struct {
-	Index     string json:"index"
-	Image     string json:"image"
-	Name      string json:"name"
-	Price     string json:"price"
-	Change24h string json:"change_24h"
+	Index     string `json:"index"`
+	Image     string `json:"image"`
+	Name      string `json:"name"`
+	Price     string `json:"price"`
+	Change24h string `json:"change_24h"`
 }
 
 type BinancePriceInfo struct {
-	Symbol string json:"symbol"
-	Price  string json:"price"
+	Symbol string `json:"symbol"`
+	Price  string `json:"price"`
 }
 
 type BinanceTickerInfo struct {
-	Symbol             string json:"symbol"
-	PriceChangePercent string json:"priceChangePercent"
+	Symbol             string `json:"symbol"`
+	PriceChangePercent string `json:"priceChangePercent"`
 }
 
 func main() {
@@ -254,5 +254,6 @@ func formatChange(change string) string {
 	if changeValue > 0 {
 		return fmt.Sprintf("+%.2f%%", changeValue)
 	}
-	return fmt.Sprintf("%.2f%%", changeValue)
+	return fmt.Sprintf("%.2f%%", (changeValue))
 }
+
